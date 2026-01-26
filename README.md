@@ -16,11 +16,12 @@ A cross-attention based module to explicitly model inter-sequence correlations b
 A novel loss function incorporating budget and Cost-Per-Acquisition (CPA) constraints, enabling selective learning of optimal bidding trajectories while filtering suboptimal behaviors.
 
 ## 2. Key Experimental Results
-All experiments are conducted on the AuctionNet dataset (consistent with [su2024a]) under ICML reproducibility standards. Key results (average over 5 independent runs):
-
-| Model          | Core Metric Score | Relative Gain over Vanilla DT |
-|----------------|-------------------|-------------------------------|
-| Vanilla DT     | 33.3              | -                             |
-| DT + CL        | 35.7              | 7.2%                          |
-| CLB-DT         | 36.7              | 10.2%                         |
-| C2 (CLB-DT+CL) | 38.4              | 15.3%                         |
+Evaluations on the AuctionNet dataset demonstrate:
+| Model          | Score  | Gain over Vanilla DT |
+|----------------|--------|----------------------|
+| Vanilla DT     | 33.3   | -                    |
+| DT + CL        | 35.7   | 7.2%                 |
+| CLB-DT         | 36.7   | 10.2%                |
+| C2 (CLB-DT+CL) | 38.4   | 15.3%                |
+- C2 outperforms SOTA baseline GAVE by up to 3.23% across 50%-150% budget settings.
+- Ablation studies confirm complementary synergy of CLB (10.2% gain) and CL (7.2% gain).
