@@ -1,8 +1,8 @@
-# C2: Constraint-aware Cross Learning Framework for Generative Auto-bidding (ICML 2026 Submission)
+# C2: Cenerative learning module enhanced decision transformer with Constraint-aware loss for auto-bidding (ICML 2026 Submission)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository is the official implementation of the paper **C2: Enhancing Decision Transformer with Cross Learning Block and Constraint-aware Loss for Auto-bidding** (submitted to ICML 2026).
+This repository is the official implementation of the paper **C2: Cenerative learning module enhanced decision transformer with Constraint-aware loss for auto-bidding** (submitted to ICML 2026).
 
 ## 1. Method Overview
 Decision Transformer (DT) is promising for generative auto-bidding but faces two key limitations:  
