@@ -1,8 +1,8 @@
-# C2: Cenerative learning module enhanced decision transformer with Constraint-aware loss for auto-bidding (ICML 2026 Submission)
+# C2: Cenerative learning module enhanced decision transformer with Constraint-aware loss for auto-bidding (ICLR 2026 Workshop AIMS Submission)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository is the official implementation of the paper **C2: Cenerative learning module enhanced decision transformer with Constraint-aware loss for auto-bidding** (submitted to ICML 2026).
+This repository is the official implementation of the paper **C2: Cenerative learning module enhanced decision transformer with Constraint-aware loss for auto-bidding** (submitted to ICLR 2026 Workshop AIMS).
 
 ## 1. Method Overview
 Decision Transformer (DT) is promising for generative auto-bidding but faces two key limitations:  
