@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+**/.DS_Store
+
+# runtime artifacts
+saved_model/
+experiments/
+data/traffic/
+!data/.gitkeep
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+
+# logs
+*.log
+
