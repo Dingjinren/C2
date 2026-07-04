@@ -1,0 +1,23 @@
+# C2 - code repository
+# Tested with Python 3.9.
+#
+# Install core (train + eval):
+#     pip install -r requirements.txt
+#
+# Install with optional visualization / analysis extras:
+#     pip install -r requirements.txt matplotlib tensorboard scipy tqdm
+#
+# For GPU (CUDA 12.4) support, torch will pull in the matching nvidia-* wheels
+# automatically. If your CUDA toolkit differs, install the appropriate torch
+# build from https://pytorch.org/get-started/previous-versions/ instead.
+
+# ---- Core (required) ----
+numpy==1.23.5
+pandas==1.5.3
+torch==2.6.0
+
+# ---- Optional (uncomment as needed) ----
+# tensorboard>=2.10       # training curves logging
+# matplotlib>=3.5         # figure generation
+# scipy>=1.9              # statistical analysis (multi-seed significance)
+# tqdm>=4.64              # progress bars

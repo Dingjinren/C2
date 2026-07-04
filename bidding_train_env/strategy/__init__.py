@@ -1,0 +1,1 @@
+from .c2_bidding_strategy import C2BiddingStrategy
