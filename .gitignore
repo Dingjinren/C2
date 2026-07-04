@@ -2,8 +2,6 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.DS_Store
-**/.DS_Store
 
 # runtime artifacts
 saved_model/
