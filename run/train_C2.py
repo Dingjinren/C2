@@ -16,7 +16,9 @@ from bidding_train_env.common.utils import save_normalize_dict
 
 os.chdir(os.path.dirname(os.path.dirname(os.path.realpath(__file__))))
 
-DEFAULT_DATA_PATH = "data/traffic/training_data_all-rlData.csv"
+DEFAULT_DATA_PATH = (
+    "data/traffic/training_data_rlData_folder/training_data_all-rlData.csv"
+)
 
 
 def set_seed(seed):

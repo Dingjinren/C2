@@ -36,13 +36,20 @@ pip install -r requirements.txt
 
 ## 4. Dataset Preparation
 
-Download the AuctionNet dataset from the [official repository](https://github.com/alimama-tech/AuctionNet) and follow its instructions to prepare the data. Place the processed training file and evaluation period files as follows:
+Download the AuctionNet dataset from the [official repository](https://github.com/alimama-tech/AuctionNet) and place the extracted period CSV files in `data/traffic/`:
 
 ```text
 data/traffic/
-├── training_data_all-rlData.csv
 └── period-*.csv
 ```
+
+Generate the reinforcement-learning training data with:
+
+```bash
+python bidding_train_env/train_data_generator/train_data_generator.py
+```
+
+The generated files are written to `data/traffic/training_data_rlData_folder/`, including the combined training file `training_data_all-rlData.csv`.
 
 The evaluation loader automatically creates `raw_data.pickle` beside the evaluation CSV on its first run and reuses it in subsequent runs.
 
@@ -52,7 +59,6 @@ Run the default C2 configuration (`hidden_size=256`, `n_layer=6`, `n_head=4`, `n
 
 ```bash
 python run/train_C2.py \
-  --data_path data/traffic/training_data_all-rlData.csv \
   --output_dir saved_model/C2 \
   --device cuda:0
 ```
