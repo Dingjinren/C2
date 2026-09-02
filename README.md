@@ -70,8 +70,7 @@ Checkpoints are saved from step 3,500 to 10,000 at intervals of 100 steps.
 Evaluate all saved checkpoints on the default evaluation split:
 
 ```bash
-EVAL_DEVICE=cuda:0 RTG_SCALE=1.3 python run/run_evaluate.py \
-  --ckpt_dir saved_model/C2
+python run/run_evaluate.py
 ```
 
 The script reports the score, constraint exceed rate, and reward of every checkpoint, followed by the checkpoint with the highest score.
