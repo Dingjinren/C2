@@ -8,11 +8,10 @@ import torch.nn.functional as F
 
 
 def getScore_nips(reward, cpa, cpa_constraint):
-    beta = 2
-    penalty = 1
-    if cpa > cpa_constraint:
-        coef = cpa_constraint / (cpa + 1e-10)
-        penalty = pow(coef, beta)
+    bias = 0.2
+    coefficient = cpa / cpa_constraint
+    distance = abs(coefficient - 1.0)
+    penalty = 1.0 / (1.0 + (distance > bias) * distance)
     return penalty * reward
 
 
@@ -32,18 +31,18 @@ class CrossSelfAttention(nn.Module):
         self.proj = nn.Linear(config['n_embd'], config['n_embd'])
         self.n_head = config['n_head']
 
-    def forward(self, x, y, mask):
-        B, T, C = x.size()
-        k = self.key(x).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
-        q = self.query(y).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
-        v = self.value(y).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
+    def forward(self, source, target, mask):
+        B, T, C = source.size()
+        k = self.key(source).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
+        q = self.query(target).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
+        v = self.value(source).view(B, T, self.n_head, C // self.n_head).transpose(1, 2)
         mask = (1.0 - mask.view(B, -1)[:, None, None, :]) * -10000.0
         att = (q @ k.transpose(-2, -1)) * (1.0 / math.sqrt(k.size(-1)))
         att = torch.where(self.bias[:, :, :T, :T].bool(), att, self.masked_bias.to(att.dtype))
         att = F.softmax(att + mask, dim=-1)
         att = self.attn_drop(att)
-        y = (att @ v).transpose(1, 2).contiguous().view(B, T, C)
-        return self.resid_drop(self.proj(y))
+        output = (att @ v).transpose(1, 2).contiguous().view(B, T, C)
+        return self.resid_drop(self.proj(output))
 
 
 class Block(nn.Module):
@@ -74,22 +73,32 @@ class Block(nn.Module):
         self.mlp_z = mlp()
 
     def forward(self, x, y, z, attn_mask):
-        xy = x + self.attn_xy(self.ln_y(y), self.ln_x(x), attn_mask)
-        xz = x + self.attn_xz(self.ln_z(z), self.ln_x(x), attn_mask)
-        yx = y + self.attn_yx(self.ln_x(x), self.ln_y(y), attn_mask)
-        yz = y + self.attn_yz(self.ln_z(z), self.ln_y(y), attn_mask)
-        zx = z + self.attn_zx(self.ln_x(z), self.ln_z(z), attn_mask)
-        zy = z + self.attn_zy(self.ln_y(y), self.ln_z(z), attn_mask)
-        x = self.mlp_x(self.ln_x2(xy + xz))
-        y = self.mlp_y(self.ln_y2(yx + yz))
-        z = self.mlp_z(self.ln_z2(zx + zx))
+        x_attn = (
+            x
+            + self.attn_xy(self.ln_y(y), self.ln_x(x), attn_mask)
+            + self.attn_xz(self.ln_z(z), self.ln_x(x), attn_mask)
+        )
+        y_attn = (
+            y
+            + self.attn_yx(self.ln_x(x), self.ln_y(y), attn_mask)
+            + self.attn_yz(self.ln_z(z), self.ln_y(y), attn_mask)
+        )
+        z_attn = (
+            z
+            + self.attn_zx(self.ln_x(x), self.ln_z(z), attn_mask)
+            + self.attn_zy(self.ln_y(y), self.ln_z(z), attn_mask)
+        )
+        x = x_attn + self.mlp_x(self.ln_x2(x_attn))
+        y = y_attn + self.mlp_y(self.ln_y2(y_attn))
+        z = z_attn + self.mlp_z(self.ln_z2(z_attn))
         return x, y, z
 
 
 class C2(nn.Module):
-    def __init__(self, state_dim, act_dim, state_mean, state_std, K=6,
+    def __init__(self, state_dim, act_dim, state_mean, state_std,
+                 hidden_size=256, n_layer=6, n_head=4, n_inner=256, K=10,
                  max_ep_len=48, scale=40, target_return=40, device="cpu",
-                 learning_rate=1e-5):
+                 learning_rate=1e-5, rtg_loss_coef=0.1):
         super().__init__()
         self.device = device
         self.state_dim = state_dim
@@ -100,22 +109,25 @@ class C2(nn.Module):
         self.max_ep_len = max_ep_len
         self.scale = scale
         self.target_return = target_return
-        self.hidden_size = 512
+        self.hidden_size = hidden_size
         self.time_dim = 8
         self.warmup_steps = 10000
         self.weight_decay = 0.0001
         self.learning_rate = learning_rate
+        self.rtg_loss_coef = rtg_loss_coef
 
-        block_config = {
+        self.block_config = {
             "n_ctx": 1024,
             "n_embd": self.hidden_size,
-            "n_layer": 6,
-            "n_head": 8,
-            "n_inner": 512,
+            "n_layer": n_layer,
+            "n_head": n_head,
+            "n_inner": n_inner,
             "resid_pdrop": 0.1,
             "attn_pdrop": 0.1,
         }
-        self.transformer = nn.ModuleList([Block(block_config) for _ in range(block_config['n_layer'])])
+        self.transformer = nn.ModuleList(
+            [Block(self.block_config) for _ in range(self.block_config['n_layer'])]
+        )
 
         self.embed_timestep = nn.Embedding(max_ep_len + 1, self.time_dim)
         self.embed_return = nn.Linear(1, self.hidden_size)
@@ -125,10 +137,11 @@ class C2(nn.Module):
         self.trans_state = nn.Linear(self.time_dim + self.hidden_size, self.hidden_size)
         self.trans_action = nn.Linear(self.time_dim + self.hidden_size, self.hidden_size)
 
-        self.predict_action = nn.Linear(self.hidden_size, act_dim)
+        self.embed_ln = nn.LayerNorm(self.hidden_size)
+        self.predict_action = nn.Sequential(nn.Linear(self.hidden_size, act_dim))
         self.predict_return = nn.Sequential(
-            nn.Linear(self.hidden_size, 128), nn.GELU(),
-            nn.Linear(128, 16), nn.GELU(),
+            nn.Linear(self.hidden_size, self.hidden_size // 4), nn.GELU(),
+            nn.Linear(self.hidden_size // 4, 16), nn.GELU(),
             nn.Linear(16, 1),
         )
 
@@ -141,7 +154,7 @@ class C2(nn.Module):
     def forward(self, states, actions, returns_to_go, timesteps, attention_mask=None):
         B, T = states.shape[0], states.shape[1]
         if attention_mask is None:
-            attention_mask = torch.ones((B, T), dtype=torch.long)
+            attention_mask = torch.ones((B, T), dtype=torch.long, device=states.device)
 
         se = self.embed_state(states)
         ae = self.embed_action(actions)
@@ -156,6 +169,12 @@ class C2(nn.Module):
             x, y, z = block(x, y, z, attention_mask)
 
         return self.predict_action(x), self.predict_return(y)
+
+    @staticmethod
+    def _shift_actions(actions):
+        action_inputs = torch.zeros_like(actions)
+        action_inputs[:, 1:] = actions[:, :-1]
+        return action_inputs
 
     def get_action(self, states, actions, returns_to_go, timesteps):
         self.eval()
@@ -187,7 +206,10 @@ class C2(nn.Module):
         mean = torch.tensor(self.state_mean, device=self.device, dtype=states.dtype)
         std = torch.tensor(self.state_std, device=self.device, dtype=states.dtype)
         states = (states - mean) / std
-        action_preds, _ = self.forward(states, actions, returns_to_go, timesteps, attention_mask)
+        action_inputs = self._shift_actions(actions)
+        action_preds, _ = self.forward(
+            states, action_inputs, returns_to_go, timesteps, attention_mask
+        )
         return action_preds[0, -1]
 
     def step(self, states, actions, rtg, timesteps, attention_mask, penalty):
@@ -200,11 +222,10 @@ class C2(nn.Module):
 
         action_target = actions.clone()
         rtg_target = rtg[:, 1:].clone()
-        actions_in = actions.clone()
-        actions_in[:, -1, 0] = 0.0
+        action_inputs = self._shift_actions(actions)
 
         action_preds, rtg_preds = self.forward(
-            states, actions_in, rtg[:, :-1], timesteps, attention_mask)
+            states, action_inputs, rtg[:, :-1], timesteps, attention_mask)
 
         mask = attention_mask.reshape(-1) > 0
         act_dim = action_preds.shape[2]
@@ -215,7 +236,10 @@ class C2(nn.Module):
         penalty = penalty.reshape(-1, 1)[mask]
 
         action_loss = torch.mean(penalty * (action_preds - action_target) ** 2)
-        rtg_loss = torch.mean(penalty * (rtg_preds - rtg_target) ** 2) * 0.1
+        rtg_loss = (
+            torch.mean(penalty * (rtg_preds - rtg_target) ** 2)
+            * self.rtg_loss_coef
+        )
         loss = action_loss + rtg_loss
 
         self.optimizer.zero_grad()
@@ -241,6 +265,9 @@ class C2(nn.Module):
             if pre_reward != 0:
                 adj_reward = getScore_nips(pre_reward, pre_cost / pre_reward, cpa_constrain)
             pred_return = self.eval_target_return[0, -1] - (adj_reward / self.scale)
+            self.eval_target_return = torch.cat(
+                [self.eval_target_return, pred_return.reshape(1, 1)], dim=1
+            )
 
             self.eval_timesteps = torch.cat([
                 self.eval_timesteps,
@@ -275,4 +302,5 @@ class C2(nn.Module):
         torch.save(self.state_dict(), os.path.join(save_path, 'dt.pt'))
 
     def load_net(self, load_path, device='cpu'):
-        self.load_state_dict(torch.load(load_path, map_location=device), strict=False)
+        state_dict = torch.load(load_path, map_location=device, weights_only=True)
+        self.load_state_dict(state_dict, strict=True)

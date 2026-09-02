@@ -26,7 +26,7 @@ def getScore_nips(reward, cpa, cpa_constraint):
     return penalty * reward
 
 
-def run_test(policy_load_dir, data_loader):
+def run_test(policy_load_dir, data_loader, model_kwargs=None):
     env = OfflineEnv()
     keys = data_loader.keys
     total_score = total_reward = exceed = 0.0
@@ -34,7 +34,10 @@ def run_test(policy_load_dir, data_loader):
     for key in keys:
         num_ts, pValues, pValueSigmas, leastWinningCosts, budget, cpa, _ = data_loader.mock_data(key)
         budget = 1. * budget
-        agent = C2BiddingStrategy(budget=budget, cpa=cpa, load_dir=policy_load_dir)
+        agent = C2BiddingStrategy(
+            budget=budget, cpa=cpa, load_dir=policy_load_dir,
+            **(model_kwargs or {}),
+        )
         rewards = np.zeros(num_ts)
         hist = {k: [] for k in ('historyBids', 'historyAuctionResult', 'historyImpressionResult',
                                 'historyLeastWinningCost', 'historyPValueInfo')}
@@ -81,11 +84,18 @@ if __name__ == '__main__':
     parser.add_argument('--model_name', default='C2')
     parser.add_argument('--ckpt_dir', default=None,
                         help='directory containing epoch subdirs (default: saved_model/<method>/)')
-    parser.add_argument('--ckpt_start', type=int, default=2000)
+    parser.add_argument('--ckpt_start', type=int, default=3500)
     parser.add_argument('--ckpt_end', type=int, default=10000)
-    parser.add_argument('--ckpt_step', type=int, default=10)
+    parser.add_argument('--ckpt_step', type=int, default=100)
     parser.add_argument('--eval_file', default='data/traffic/period-19.csv')
+    parser.add_argument('--hidden_size', type=int, default=256)
+    parser.add_argument('--n_layer', type=int, default=6)
+    parser.add_argument('--n_head', type=int, default=4)
+    parser.add_argument('--n_inner', type=int, default=256)
+    parser.add_argument('--K', type=int, default=10)
     args = parser.parse_args()
+    if args.ckpt_step <= 0:
+        parser.error('--ckpt_step must be positive')
 
     model_name = args.model_name
     ckpt_dir = args.ckpt_dir or f"saved_model/{model_name}"
@@ -103,9 +113,16 @@ if __name__ == '__main__':
     data_loader = TestDataLoader(file_path=args.eval_file)
 
     logger.info(f"Evaluating {len(policy_load_dir)} ckpts on {args.eval_file}")
-    best_score, best_dir = 0, ""
+    best_score, best_dir = float('-inf'), ""
+    model_kwargs = {
+        "hidden_size": args.hidden_size,
+        "n_layer": args.n_layer,
+        "n_head": args.n_head,
+        "n_inner": args.n_inner,
+        "K": args.K,
+    }
     for policy in policy_load_dir:
-        score, exc, reward = run_test(policy, data_loader)
+        score, exc, reward = run_test(policy, data_loader, model_kwargs)
         logger.info(f"ckpt {policy} score={score:.4f} exceed={exc:.4f} reward={reward:.4f}")
         if score > best_score:
             best_score, best_dir = score, policy

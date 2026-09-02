@@ -11,23 +11,27 @@ from bidding_train_env.strategy.base_bidding_strategy import BaseBiddingStrategy
 class C2BiddingStrategy(BaseBiddingStrategy):
     """Decision-Transformer (C2) player strategy."""
 
-    def __init__(self, budget=100, name="DT-Player", cpa=2, category=1, load_dir=None):
+    def __init__(self, budget=100, name="DT-Player", cpa=2, category=1,
+                 load_dir=None, hidden_size=256, n_layer=6, n_head=4,
+                 n_inner=256, K=10):
         super().__init__(budget, name, cpa, category)
 
         model_path = os.path.join(load_dir, "dt.pt")
-        picklePath = os.path.join(load_dir, "normalize_dict.pkl")
+        pickle_path = os.path.join(load_dir, "normalize_dict.pkl")
 
         device = os.environ.get("EVAL_DEVICE")
         if device is None:
             device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        with open(picklePath, 'rb') as f:
+        with open(pickle_path, 'rb') as f:
             normalize_dict = pickle.load(f)
 
         self.model = C2(state_dim=16, act_dim=1,
                         state_mean=normalize_dict["state_mean"],
                         state_std=normalize_dict["state_std"],
-                        target_return=1., device=device)
+                        hidden_size=hidden_size, n_layer=n_layer,
+                        n_head=n_head, n_inner=n_inner, K=K,
+                        device=device)
         self.model.load_net(model_path, device=device)
         self.model.to(device)
         self.model.eval()
